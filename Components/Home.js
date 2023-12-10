@@ -3,16 +3,24 @@ import { createMaterialBottomTabNavigator } from "@react-navigation/material-bot
 import List_Profile from "../Homescreens/List_Profile";
 import MyAccount from "../Homescreens/MyAccount";
 import Groupe from "../Homescreens/Groupe";
+import { useRoute } from '@react-navigation/native';
 const Tab = createMaterialBottomTabNavigator();
 
 const Home = (props) => {
+  const route = useRoute();
+  const { currentid } = route.params;
     
-  const currentId = props.route.params.currentId;
     return (
-      <Tab.Navigator>
-        <Tab.Screen name="listprofile" component={List_Profile}  initialParams={{currentId}}/>
-        <Tab.Screen name="groupe" component={Groupe} initialParams={{currentId}}/>
-        <Tab.Screen name="myaccount" component={MyAccount} initialParams={{currentId}} />
+      <Tab.Navigator initialRouteName="listprofile" screenOptions={{tabBarVisible: true}} backBehavior="initialRoute">
+        <Tab.Screen name="listprofile" component={List_Profile}  initialParams={{currentid : currentid}}  options={{
+          tabBarLabel: 'List Profile',
+        }}/>
+        <Tab.Screen name="groupe" component={Groupe} options={{
+          tabBarLabel: 'Groupe',
+        }}/>
+        <Tab.Screen name="myaccount" component={MyAccount} initialParams={{currentid: currentid}} options={{
+          tabBarLabel: 'My Account',
+        }} />
       </Tab.Navigator>
     );
   };

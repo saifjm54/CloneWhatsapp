@@ -1,64 +1,61 @@
-import React, { useState ,useEffect} from 'react';
+import React, { useState,useEffect } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Button, TextInput, Card } from 'react-native-paper';
-import img from './../assets/user.png';
 import * as ImagePicker from "expo-image-picker";
 import firebase from '../Config/Index';
-import { TouchableOpacity } from 'react-native-web';
+import { TouchableOpacity } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 const database=firebase.database();
-const MyAccount = () => {
-  const [nom, setnom] = useState('');
-  const [prenom, setSsetprenom] = useState('');
-  const [tel, settel] = useState('');
+const MyAccount = (props) => {
+  const route = useRoute();
+  const currentid = route.params?.currentid; // Access the currentid parameter from route.params
+  const [userDetails,setUserDetails] = useState({
+    nom: '',
+    prenom: '',
+    tel: '',
+    url: '',
+    uid:"",
+  })
   const [Isdefault, setIsdefault] = useState(true);
   const [urlImage, seturlImage] = useState('');
-  const userId = auth.currentUser.uid;
-
   const handleNameChange = (text) => {
-    setnom(text);
+    setUserDetails({ ...userDetails, nom: text})
   };
 
   const handleSurnameChange = (text) => {
-    setSsetprenom(text);
+    setUserDetails({ ...userDetails, prenom: text});
   };
 
   const handleEmailChange = (text) => {
-    settel(text);
+    setUserDetails({ ...userDetails, tel: text});
   };
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchData = async () => {
+      console.log(currentid);
+      const profileRef = database.ref(`profils/${currentid}`);
+      setUserDetails({ ...userDetails, uid: currentid });
+      console.log(userDetails);
+  
       try {
-        // Assuming auth.currentUser.uid is the user ID
-        const snapshot = await database().ref(`profils/${userId}`).once('value');
-        const userData = snapshot.val();
-
-        if (userData) {
-          setNom(userData.nom);
-          setPrenom(userData.prenom);
-          setTel(userData.tel);
-          setUrlImage(userData.url); // Assuming the URL is stored in the 'url' field
-          setIsDefault(false); // Set isDefault to false when the URL is available
+        const snapshot = await profileRef.once('value');
+        if (snapshot.exists()) {
+          console.log('yes');
+          const profileData = snapshot.val();
+          setUserDetails({ ...profileData, uid: currentid });
+          setIsdefault(true);
+          console.log(profileData);
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching data:', error);
       }
     };
-
-    fetchUserData();
-  }, []);
+  
+    fetchData();
+  }, [currentid]);
 
   const saveUserData = async () => {
-    const url=await uploadimagetofirebase(urlImage);
-    const ref_profils=database.ref("profils");
-    const ref_un_profile=ref_profils.child("profil" + userId);
-    ref_un_profile.set(
-        {
-            nom:nom,
-            prenom:prenom,
-            tel:tel,
-            url:url
-        }
-    )
+    await database.ref(`profils/${currentid}`).set(userDetails);
+    console.log('User details updated successfully!');
   };
 
   const pickImage = async () => {
@@ -75,6 +72,7 @@ const MyAccount = () => {
     if (!result.canceled) {
       setIsdefault(false);
       seturlImage(result.assets[0].uri);
+      setUserDetails({ ...userDetails, url: result.assets[0].uri });
     }
   };
   const imageToBlob = async (uri) => {
@@ -107,9 +105,7 @@ const MyAccount = () => {
     //recuperer url
     const url=ref_image.getDownloadURL();
     return url;
-    
-    
-      }
+    }
 
   return (
     <View style={styles.container}>
@@ -128,7 +124,7 @@ const MyAccount = () => {
         <Card.Content>
           <Text style={styles.cardTitle}>Nom</Text>
           <TextInput
-            value={nom}
+            value={userDetails.nom}
             onChangeText={handleNameChange}
             style={styles.input}
           />
@@ -140,7 +136,7 @@ const MyAccount = () => {
         <Card.Content>
           <Text style={styles.cardTitle}>Prenom</Text>
           <TextInput
-            value={prenom}
+            value={userDetails.prenom}
             onChangeText={handleSurnameChange}
             style={styles.input}
           />
@@ -152,7 +148,7 @@ const MyAccount = () => {
         <Card.Content>
           <Text style={styles.cardTitle}>Email</Text>
           <TextInput
-            value={tel}
+            value={userDetails.tel}
             onChangeText={handleEmailChange}
             style={styles.input}
           />
@@ -164,7 +160,7 @@ const MyAccount = () => {
         mode="contained"
         style={styles.saveButton}
         labelStyle={styles.buttonLabel}
-        onPress={saveUserData}
+        onPress={async() => {await saveUserData()}}
       >
         Save
       </Button>

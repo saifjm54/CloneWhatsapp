@@ -1,24 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import firebase from '../Config/Index';
-
+import { useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 
 const List_Profile = (props) => {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const currentid = route.params?.currentid;
   const database = firebase.database();
   const profilesRef = database.ref('profils');
   const [profilesData, setProfilesData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProfiles, setFilteredProfiles] = useState([]);
+  const [counted, setcounted] = useState({id:'',count:0});
   useEffect(() => {
+    console.log(currentid);
     profilesRef.on('value', (snapshot) => {
       const data = snapshot.val();
       if(data){
-        setProfilesData(Object.values(data));
-        setFilteredProfiles(Object.values(data));
+        const profiles = Object.values(data);
+        // Filter out the profile where uid matches the key
+        const filteredProfiles = profiles.filter(profile => profile.uid !== currentid);
+        setProfilesData(filteredProfiles);
+        setFilteredProfiles(filteredProfiles);
       }
     });
   },[]);
+  const ref_msg = database.ref("msgS")
 
+  // Function to retrieve the count of unred messages
+
+  const countUnreadMessages = async () => {
+    try{
+      const snapshot = await ref_msg.orderByChild('status').equalTo(false).once('value');
+      const profilesCopy = [...profilesData];
+      snapshot.forEach((childSnapshot) => {
+        const message = childSnapshot.val();
+        const senderId = message.sender;
+
+        // Find the index of the sender int the profiles list 
+        const senderIndex = profilesCopy.findIndex( profile => profile.uid === senderId);
+        if(senderIndex !== -1){
+          profilesCopy[senderIndex].unreadCount = profilesCopy[senderIndex].unreadCount ? profilesCopy[senderIndex].unreadCount + 1 : 1;
+
+        }
+      });
+
+      // Update the state with the updated profiles list including unreads count
+      setProfilesData(profilesCopy);
+    }catch(error){
+      console.error('Error counting unread messages:', error);
+    }
+  }
+  useEffect(() => {
+    countUnreadMessages();
+  }, []);
   const handleSearch = (text) => {
     setSearchQuery(text);
     const searchWords = text.toLowerCase().split(' ');
@@ -43,7 +80,14 @@ const List_Profile = (props) => {
   };
 
   const renderProfile = ({ item }) => (
-    <View style={styles.profileItem}>
+    <View style={styles.profileItem}  onClick={()=>{
+      alert(`
+      Profil Details
+      Nom : ${item.nom}
+      Prenom : ${item.prenom}
+      Tel : ${item.tel}
+      `)
+    }}>
       <Image source={item.url ?item.url:require('../assets/user.png')} style={styles.profileImage} />
 
       <View style={styles.profileInfo}>
@@ -52,7 +96,9 @@ const List_Profile = (props) => {
       </View>
 
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity style={styles.button} onPress={() => handleDelete(item)}>
+        <TouchableOpacity style={styles.button} onPress={() =>{
+          navigation.navigate('Chat' , {currentid,id_user:item.uid}); // Adjust 'Chat' and 'currentId' as needed
+        }}>
           <Text>Message</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => handleCall(item)}>
@@ -75,6 +121,7 @@ const List_Profile = (props) => {
         data={filteredProfiles}
         keyExtractor={(item) => item.id}
         renderItem={renderProfile}
+        id={(item) => item.id}
       />
     </View>
   );
