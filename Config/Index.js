@@ -1,4 +1,4 @@
-/* // Import the functions you need from the SDKs you need
+// Import the functions you need from the SDKs you need
 import app from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/storage";
@@ -22,9 +22,9 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const firebase = app.initializeApp(firebaseConfig);
-export default firebase; */
+export default firebase; 
 
- import app from "firebase/compat/app";
+/*import app from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/database";
 import "firebase/compat/storage";
@@ -46,4 +46,4 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const firebase=app.initializeApp(firebaseConfig);
-export default firebase; 
+export default firebase; */

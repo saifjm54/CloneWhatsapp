@@ -2,60 +2,117 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TextInput, TouchableOpacity, FlatList } from 'react-native';
 import firebase from '../Config/Index';
 import { useRoute } from '@react-navigation/native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
 const database = firebase.database();
 
 export default function Chat() {
     const route = useRoute();
    // const currentid = route.params?.currentid;
-    const { currentid, id_user } = route.params;
+    const { currentId, id_user } = route.params;
+    const [isTyping, setIsTyping] = useState(false);
     const [msg, setMsg] = useState('');
     const [messages , setMessages] = useState([]);
+    const handleTyping = (isFocused) => {
+      const currentUserTypingRef = database.ref(`conversation/${currentId}_${id_user}/isTyping`);
+      currentUserTypingRef.set(isFocused);
+  
+      const otherUserTypingRef = database.ref(`conversation/${id_user}_${currentId}/isTyping`);
+      otherUserTypingRef.on('value', (snapshot) => {
+        const otherUserIsTyping = snapshot.val();
+        setIsTyping(otherUserIsTyping);
+      });
+    };
     useEffect(() => {
-        const  ref_msg= database.ref('msgS').orderByChild('time');
-        if(currentid > id_user){
-          room_id = currentid + id_user;
-
-        }else{
-          room_id = id_user + currentid;
-        }
-        const messageRef = ref_msg.child(room_id);
-
-        // Listen for new messages and maintain the order
-        messageRef.on('child_added',(snapshot) => {
-            const newMessage = snapshot.val();
-            setMessages(prevMessages => [...prevMessages,{ ...newMessage,id: snapshot.key}]);
+      setMessages("")
+      const messageRef = database.ref('msgS').orderByChild('time');
+      
+      messageRef.on('value', (snapshot) => {
+        const messagesArray = [];
+        snapshot.forEach((childSnapshot) => {
+          const message = childSnapshot.val();
+          if (
+            (message.sender === currentId && message.receiver === id_user) ||
+            (message.sender === id_user && message.receiver === currentId)
+          ) {
+            messagesArray.push({ ...message, id: childSnapshot.key });
+          }
         });
-
-        // Clean up the listener when the component unmounts
-        return () => {
-            messageRef.off('child_added');
-        };
-    },[]);
+        // Sort messages by time or any other relevant criterion
+        messagesArray.sort((a, b) => a.time - b.time);
+        setMessages(messagesArray);
+      });
+    
+      // Clean up the listener when the component unmounts
+      return () => {
+        messageRef.off('value');
+      };
+    }, [currentId, id_user]);
+    const handleDropMessage = (messageId) => {
+      // Prompt the user to confirm before dropping the message
+      const confirmDrop = window.confirm('Are you sure you want to drop this message?');
+      
+      if (confirmDrop) {
+        // Find the message with the specified ID in the database
+        const messagesRef = database.ref('msgS');
+        messagesRef.orderByChild('id').equalTo(messageId).once('value', (snapshot) => {
+          snapshot.forEach((childSnapshot) => {
+            const messageKey = childSnapshot.key;
+            // Update the status of the message to mark it as unsent
+            database.ref(`msgS/${messageKey}`).update({ 
+              msg: 'unsent',      
+              droped: true,      
+            })
+            .then(() => {
+              console.log(`Message with ID ${messageId} marked as unsent`);
+              const messageRef = database.ref('msgS').orderByChild('time');
+    
+              messageRef.on('value', (snapshot) => {
+                const messagesArray = [];
+                snapshot.forEach((childSnapshot) => {
+                  const message = childSnapshot.val();
+                  if (
+                    (message.sender === currentId && message.receiver === id_user) ||
+                    (message.sender === id_user && message.receiver === currentId)
+                  ) {
+                    messagesArray.push({ ...message, id: childSnapshot.key });
+                  }
+                });
+                // Sort messages by time or any other relevant criterion
+                messagesArray.sort((a, b) => a.time - b.time);
+                setMessages(messagesArray);
+              });
+            })
+            .catch((error) => {
+              console.error('Error updating message status:', error);
+            });
+          });
+        });
+      } else {
+        console.log('Message drop canceled by user');
+        // You might want to handle what happens if the user cancels dropping the message here
+      }
+    };
 
     const sendMessage = () => {
-      console.log(currentid);
-        const currentTime = new Date().toISOString();
-        const ref_msg = database.ref("msgS");
-        if(currentid > id_user){
-          room_id = currentid + id_user;
-
-        }else{
-          room_id = id_user + currentid;
-        }
-        ref_room = ref_msg.child(room_id); 
-        const key = ref_room.push().key;
-        ref_room.child(key).set({
-          msg: msg,
-          sender: currentid,
-          receiver: id_user,
-          time: currentTime,
-          status:false
-        });
-        setMsg('');
+      const currentTime = new Date().toISOString();
+      const ref_msg = database.ref("msgS");
+      const key = ref_msg.push().key;
+      console.log(id_user)
+      ref_msg.child(key).set({
+        id:currentId+"_"+id_user+"_"+currentTime,
+        msg: msg,
+        sender: currentId,
+        receiver: id_user,
+        time: currentTime,
+        status:false,
+        droped:false,
+      });
+      console.log(key)
+      setMsg('');
     };
     const renderMessage = ({item}) => {
-        const isCurrentUser = item.sender === currentid;
+        const isCurrentUser = item.sender === currentId;
         return(
             <View style={[styles.messageContainer,isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage]}>
                 <Text>{item.msg}</Text>
@@ -70,6 +127,18 @@ export default function Chat() {
           keyExtractor={(item) => item.id}
           // Remove inverted attribute to display messages at the bottom
         />
+
+<View>
+
+<KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      
+      >
+        {isTyping &&             <View style={[styles.messageContainer, styles.otherUserMessage]}>
+ <Text style={styles.typingIndicator}>{`is typing...`}</Text>         </View>
+}
+        </KeyboardAvoidingView>
+        </View>
           <View style={styles.inputContainer}>
             <TextInput
               value={msg}
@@ -148,4 +217,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   });
+  
   
